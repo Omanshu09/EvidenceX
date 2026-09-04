@@ -1,5 +1,7 @@
 // Document parsing (PDF / DOCX / TXT) + smart chunking, all in-browser.
 
+import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
+
 export interface Chunk {
   id: string;
   docId: string;
@@ -20,15 +22,16 @@ export interface ParsedDoc {
 
 // --- extractors ---
 
-async function extractPdf(arrayBuffer: ArrayBuffer): Promise<{ text: string; pages: number }> {
+async function extractPdf(file: File): Promise<{ text: string; pages: number }> {
   const pdfjs = await import('pdfjs-dist');
-  // Pin the worker to the jsdelivr CDN with the exact installed version.
-  // This guarantees the worker matches the main library (no version mismatch crash).
-  pdfjs.GlobalWorkerOptions.workerSrc =
-    'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs';
+  // Bundle the worker into our own build via Vite (?url) so it is always present.
+  pdfjs.GlobalWorkerOptions.workerSrc = pdfjsWorker;
+
+  const arrayBuffer = await file.arrayBuffer();
+  const copy = arrayBuffer.slice(0);
 
   const doc = await pdfjs.getDocument({
-    data: arrayBuffer,
+    data: copy,
     isEvalSupported: false,
     disableFontFace: true,
     verbosity: 0,
@@ -99,7 +102,7 @@ export async function parseFile(file: File, docId: string): Promise<ParsedDoc> {
   let pages: number | undefined;
 
   if (ext === 'pdf') {
-    const r = await extractPdf(buf);
+    const r = await extractPdf(file);
     fullText = r.text;
     pages = r.pages;
   } else if (ext === 'docx') {
