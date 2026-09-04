@@ -22,6 +22,7 @@ export interface ParsedDoc {
 
 async function extractPdf(arrayBuffer: ArrayBuffer): Promise<{ text: string; pages: number }> {
   const pdfjs = await import('pdfjs-dist');
+  pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.mjs`;
   const doc = await pdfjs.getDocument({ data: arrayBuffer }).promise;
   let text = '';
   const numPages = doc.numPages;
@@ -47,7 +48,6 @@ async function extractDocx(arrayBuffer: ArrayBuffer): Promise<string> {
 }
 
 function extractTxt(arrayBuffer: ArrayBuffer): string {
-  // Try utf-8, fallback latin-1
   const bytes = new Uint8Array(arrayBuffer);
   try {
     return new TextDecoder('utf-8', { fatal: false }).decode(bytes);
