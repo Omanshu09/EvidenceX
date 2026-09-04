@@ -20,31 +20,20 @@ export interface ParsedDoc {
 
 // --- extractors ---
 
-async function extractPdf(file: File): Promise<{ text: string; pages: number }> {
+async function extractPdf(arrayBuffer: ArrayBuffer): Promise<{ text: string; pages: number }> {
   const pdfjs = await import('pdfjs-dist');
-  // Force the "fake worker" (runs on the main thread). No workerSrc file needed,
-  // which eliminates the "GlobalWorkerOptions.workerSrc" error entirely.
-  (pdfjs as any).GlobalWorkerOptions.workerSrc = (pdfjs as any).GlobalWorkerOptions.workerSrc || 'pdfjs';
-  (pdfjs as any).GlobalWorkerOptions.workerPort = null;
+  // Pin the worker to the jsdelivr CDN with the exact installed version.
+  // This guarantees the worker matches the main library (no version mismatch crash).
+  pdfjs.GlobalWorkerOptions.workerSrc =
+    'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs';
 
-  const disableWorker = () => {
-    // If a worker is attempted and fails, fall back gracefully.
-  };
-
-  const arrayBuffer = await file.arrayBuffer();
-  const copy = arrayBuffer.slice(0);
-
-  const loadingTask = pdfjs.getDocument({
-    data: copy,
+  const doc = await pdfjs.getDocument({
+    data: arrayBuffer,
     isEvalSupported: false,
     disableFontFace: true,
-    useSystemFonts: true,
     verbosity: 0,
-  });
-  // Prevent worker creation so pdfjs runs the fake worker on the main thread.
-  (pdfjs as any).GlobalWorkerOptions.workerSrc = undefined;
+  }).promise;
 
-  const doc = await loadingTask.promise;
   let text = '';
   const numPages = doc.numPages;
   for (let i = 1; i <= numPages; i++) {
@@ -110,7 +99,7 @@ export async function parseFile(file: File, docId: string): Promise<ParsedDoc> {
   let pages: number | undefined;
 
   if (ext === 'pdf') {
-    const r = await extractPdf(file);
+    const r = await extractPdf(buf);
     fullText = r.text;
     pages = r.pages;
   } else if (ext === 'docx') {
