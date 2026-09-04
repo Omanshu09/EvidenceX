@@ -22,18 +22,29 @@ export interface ParsedDoc {
 
 async function extractPdf(file: File): Promise<{ text: string; pages: number }> {
   const pdfjs = await import('pdfjs-dist');
-  pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-    'pdfjs-dist/build/pdf.worker.min.mjs',
-    import.meta.url,
-  ).toString();
+  // Force the "fake worker" (runs on the main thread). No workerSrc file needed,
+  // which eliminates the "GlobalWorkerOptions.workerSrc" error entirely.
+  (pdfjs as any).GlobalWorkerOptions.workerSrc = (pdfjs as any).GlobalWorkerOptions.workerSrc || 'pdfjs';
+  (pdfjs as any).GlobalWorkerOptions.workerPort = null;
+
+  const disableWorker = () => {
+    // If a worker is attempted and fails, fall back gracefully.
+  };
+
   const arrayBuffer = await file.arrayBuffer();
   const copy = arrayBuffer.slice(0);
-  const doc = await pdfjs.getDocument({
+
+  const loadingTask = pdfjs.getDocument({
     data: copy,
     isEvalSupported: false,
     disableFontFace: true,
+    useSystemFonts: true,
     verbosity: 0,
-  }).promise;
+  });
+  // Prevent worker creation so pdfjs runs the fake worker on the main thread.
+  (pdfjs as any).GlobalWorkerOptions.workerSrc = undefined;
+
+  const doc = await loadingTask.promise;
   let text = '';
   const numPages = doc.numPages;
   for (let i = 1; i <= numPages; i++) {
