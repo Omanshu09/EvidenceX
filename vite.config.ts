@@ -9,4 +9,7 @@ export default defineConfig({
   optimizeDeps: {
     exclude: ['@xenova/transformers'],
   },
+  build: {
+    chunkSizeWarningLimit: 2000,
+  },
 });
