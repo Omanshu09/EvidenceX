@@ -22,22 +22,18 @@ export interface ParsedDoc {
 
 async function extractPdf(file: File): Promise<{ text: string; pages: number }> {
   const pdfjs = await import('pdfjs-dist');
-  const version = pdfjs.version;
-  pdfjs.GlobalWorkerOptions.workerSrc =
-    `https://cdn.jsdelivr.net/npm/pdfjs-dist@${version}/build/pdf.worker.min.mjs`;
-
-  // Copy ArrayBuffer to avoid potential SharedArrayBuffer / detached-buffer issues
+  pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+    'pdfjs-dist/build/pdf.worker.min.mjs',
+    import.meta.url,
+  ).toString();
   const arrayBuffer = await file.arrayBuffer();
   const copy = arrayBuffer.slice(0);
-
   const doc = await pdfjs.getDocument({
     data: copy,
     isEvalSupported: false,
-    useSystemFonts: true,
     disableFontFace: true,
     verbosity: 0,
   }).promise;
-
   let text = '';
   const numPages = doc.numPages;
   for (let i = 1; i <= numPages; i++) {
