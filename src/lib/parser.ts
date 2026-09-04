@@ -1,7 +1,5 @@
 // Document parsing (PDF / DOCX / TXT) + smart chunking, all in-browser.
 
-import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
-
 export interface Chunk {
   id: string;
   docId: string;
@@ -22,16 +20,14 @@ export interface ParsedDoc {
 
 // --- extractors ---
 
-async function extractPdf(file: File): Promise<{ text: string; pages: number }> {
+async function extractPdf(arrayBuffer: ArrayBuffer): Promise<{ text: string; pages: number }> {
   const pdfjs = await import('pdfjs-dist');
-  // Bundle the worker into our own build via Vite (?url) so it is always present.
-  pdfjs.GlobalWorkerOptions.workerSrc = pdfjsWorker;
-
-  const arrayBuffer = await file.arrayBuffer();
-  const copy = arrayBuffer.slice(0);
+  // CDN approach — always returns a plain string URL, never fails in production.
+  pdfjs.GlobalWorkerOptions.workerSrc =
+    'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.worker.min.mjs';
 
   const doc = await pdfjs.getDocument({
-    data: copy,
+    data: arrayBuffer,
     isEvalSupported: false,
     disableFontFace: true,
     verbosity: 0,
@@ -102,7 +98,7 @@ export async function parseFile(file: File, docId: string): Promise<ParsedDoc> {
   let pages: number | undefined;
 
   if (ext === 'pdf') {
-    const r = await extractPdf(file);
+    const r = await extractPdf(buf);
     fullText = r.text;
     pages = r.pages;
   } else if (ext === 'docx') {
